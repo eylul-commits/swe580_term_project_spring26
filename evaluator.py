@@ -29,7 +29,12 @@ def extract_note_paths(response: str) -> list[str]:
     """
     Extract note paths from the LLM's response.
     Looks for RESULT_PATHS line first, then falls back to regex extraction.
+    Any mix of '/' and '\\' separators is collapsed to '/' so Windows-style
+    paths returned by the backend match the forward-slash paths in test_queries.json.
     """
+    def _norm(p: str) -> str:
+        return re.sub(r"[\\/]+", "/", p)
+
     # Strategy 1: Look for the explicit RESULT_PATHS marker
     match = re.search(r"RESULT_PATHS:\s*\[([^\]]*)\]", response)
     if match:
@@ -38,12 +43,12 @@ def extract_note_paths(response: str) -> list[str]:
         if not paths:
             paths = re.findall(r"'([^']+\.md)'", raw)
         if paths:
-            return sorted(set(paths))
+            return sorted({_norm(p) for p in paths})
 
     # Strategy 2: Extract any .md file paths from the response
-    paths = re.findall(r'(?:[\w-]+/)?[\w-]+\.md', response)
+    paths = re.findall(r'(?:[\w-]+[\\/]+)?[\w-]+\.md', response)
     # Deduplicate and sort
-    return sorted(set(paths))
+    return sorted({_norm(p) for p in paths})
 
 
 # ── Metrics ─────────────────────────────────────────────────────────────────
