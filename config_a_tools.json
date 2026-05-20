@@ -3,26 +3,26 @@
     "type": "function",
     "function": {
       "name": "search_notes",
-      "description": "Search notes in the vault.",
+      "description": "Search the vault for notes. Any combination of the optional parameters may be supplied in a single call and the filters are ANDed together (e.g., text query AND tags AND date range). Use it to find notes by content, by tag, by date, or by several of these at once. Returns a list of matching notes.",
       "parameters": {
         "type": "object",
         "properties": {
           "query": {
             "type": "string",
-            "description": "Text to search for."
+            "description": "Full-text query matched against note title and body. Optional."
           },
           "tags": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Filter by tags."
+            "description": "List of tags the note must have. All tags must be present (AND logic). Optional."
           },
           "date_from": {
             "type": "string",
-            "description": "Start date in YYYY-MM-DD format."
+            "description": "Inclusive lower bound on creation date in YYYY-MM-DD format. Optional."
           },
           "date_to": {
             "type": "string",
-            "description": "End date in YYYY-MM-DD format."
+            "description": "Inclusive upper bound on creation date in YYYY-MM-DD format. Optional."
           }
         },
         "required": []
@@ -33,17 +33,17 @@
     "type": "function",
     "function": {
       "name": "get_note",
-      "description": "Retrieve a specific note by path or title.",
+      "description": "Retrieve the full contents of a single note. Provide either a file path or a title (at least one is required). Use this once you already know which note you want; it is not for browsing or searching.",
       "parameters": {
         "type": "object",
         "properties": {
           "path": {
             "type": "string",
-            "description": "File path of the note."
+            "description": "Exact file path of the note (e.g., 'vault/folder/note.md'). Use when the path is known."
           },
           "title": {
             "type": "string",
-            "description": "Title of the note."
+            "description": "Title of the note, which is the filename without the .md extension. Use when only the title is known."
           }
         },
         "required": []
@@ -54,22 +54,22 @@
     "type": "function",
     "function": {
       "name": "get_related_notes",
-      "description": "Find notes connected to a specific note through links.",
+      "description": "Find notes connected to a target note through wiki-style [[links]]. Identify the target note with either 'path' or 'title'. The 'direction' parameter controls which links are returned.",
       "parameters": {
         "type": "object",
         "properties": {
           "path": {
             "type": "string",
-            "description": "File path of the note."
+            "description": "Exact file path of the target note. Provide this or 'title'."
           },
           "title": {
             "type": "string",
-            "description": "Title of the note."
+            "description": "Title of the target note (filename without .md). Provide this or 'path'."
           },
           "direction": {
             "type": "string",
             "enum": ["outgoing", "incoming", "both"],
-            "description": "Which links to return.",
+            "description": "Which links to return: 'outgoing' for notes the target links to, 'incoming' for notes that link to the target, 'both' for both sets. Defaults to 'both'.",
             "default": "both"
           }
         },
@@ -81,7 +81,7 @@
     "type": "function",
     "function": {
       "name": "get_vault_overview",
-      "description": "Get vault statistics and recent notes.",
+      "description": "Get vault statistics (total note count, notes per folder, the full set of tags) together with the 5 most recently modified notes. Useful for orienting yourself or when the query asks about the vault as a whole rather than a specific note.",
       "parameters": {
         "type": "object",
         "properties": {},
