@@ -151,5 +151,73 @@
         "required": []
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "create_note",
+      "description": "Create a new markdown note in the vault with a path, title, and body content. Does not set tags or links; use add_tags_to_note and add_link_to_note for those after creation.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative file path inside the vault (e.g., 'synthesis/Weekly_Recap.md'). The .md extension is added if missing."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title for the YAML frontmatter. Defaults to the filename with underscores replaced by spaces."
+          },
+          "content": {
+            "type": "string",
+            "description": "Body of the note in markdown. Optional."
+          }
+        },
+        "required": ["path"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "add_tags_to_note",
+      "description": "Add one or more tags to the YAML frontmatter of an existing note. Tags are deduplicated. Does not modify body or links.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative file path of the target note inside the vault."
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tags to add to the note's YAML frontmatter."
+          }
+        },
+        "required": ["path", "tags"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "add_link_to_note",
+      "description": "Append a wiki-style [[link]] to the body of an existing note. Spaces in the target title are converted to underscores so backlinks resolve correctly. Does not modify tags.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative file path of the source note inside the vault."
+          },
+          "target_title": {
+            "type": "string",
+            "description": "Title of the note to link to (filename without .md, e.g., 'Transformers' or 'Attention Mechanisms')."
+          }
+        },
+        "required": ["path", "target_title"]
+      }
+    }
   }
 ]

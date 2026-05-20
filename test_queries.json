@@ -317,6 +317,33 @@
         "daily/2026-02-04.md",
         "daily/2026-02-05.md"
       ]
+    },
+    {
+      "id": "qs01",
+      "category": "synthesis",
+      "query": "Create a new note at synthesis/Attention_Summary.md titled 'Attention Summary' that explains the connection between Transformers, Self Attention, and Attention Mechanisms. Tag the note with summary and nlp, and add wiki links to Transformers, Self Attention, and Attention Mechanisms.",
+      "expected_file": "synthesis/Attention_Summary.md",
+      "expected_substrings": [],
+      "expected_links": ["Transformers", "Self_Attention", "Attention_Mechanisms"],
+      "expected_tags": ["summary", "nlp"]
+    },
+    {
+      "id": "qs02",
+      "category": "synthesis",
+      "query": "Create a new note at synthesis/Python_Toolkit.md titled 'Python Toolkit' that collects my python reference notes. Tag the note with reference and python, and add wiki links to Python Tips, Pandas Tips, and Numpy Guide.",
+      "expected_file": "synthesis/Python_Toolkit.md",
+      "expected_substrings": [],
+      "expected_links": ["Python_Tips", "Pandas_Tips", "Numpy_Guide"],
+      "expected_tags": ["reference", "python"]
+    },
+    {
+      "id": "qs03",
+      "category": "synthesis",
+      "query": "Create a new note at synthesis/Language_Models_Reading_List.md titled 'Language Models Reading List' covering BERT, GPT, and Transformers. Tag the note with reading-list and nlp, and add wiki links to BERT, GPT, and Transformers.",
+      "expected_file": "synthesis/Language_Models_Reading_List.md",
+      "expected_substrings": [],
+      "expected_links": ["BERT", "GPT", "Transformers"],
+      "expected_tags": ["reading-list", "nlp"]
     }
   ]
 }

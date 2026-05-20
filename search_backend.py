@@ -311,6 +311,126 @@ def get_recent_notes(ix: index.Index, limit: int = DEFAULT_LIMIT) -> list[dict]:
         return [_hit_to_dict(r) for r in results]
 
 
+# ── Note Creation / Mutation ────────────────────────────────────────────────
+# These functions write to the vault and keep the Whoosh index in sync.
+
+def _reindex_note(ix: index.Index, vault_path: str, full_path: str) -> dict | None:
+    doc = parse_note(full_path, vault_path)
+    if not doc:
+        return None
+    writer = ix.writer()
+    writer.update_document(**doc)
+    writer.commit()
+    return doc
+
+
+def create_note_file(
+    ix: index.Index,
+    vault_path: str,
+    rel_path: str,
+    title: str = None,
+    content: str = "",
+    tags: list[str] = None,
+    links: list[str] = None,
+) -> dict:
+    """Create a markdown note with YAML frontmatter and index it."""
+    if not rel_path.endswith(".md"):
+        rel_path = rel_path + ".md"
+
+    full_path = os.path.join(vault_path, rel_path)
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+    now_iso = datetime.now().replace(microsecond=0).isoformat()
+    fm = {
+        "title": title or Path(rel_path).stem.replace("_", " "),
+        "tags": list(tags) if tags else [],
+        "created": now_iso,
+        "modified": now_iso,
+    }
+    fm_yaml = yaml.safe_dump(fm, sort_keys=False).strip()
+
+    body_parts = []
+    if content:
+        body_parts.append(content.rstrip())
+    if links:
+        link_line = " ".join(f"[[{l.replace(' ', '_')}]]" for l in links)
+        body_parts.append(link_line)
+
+    body = "\n\n".join(body_parts)
+    full_text = f"---\n{fm_yaml}\n---\n{body}\n"
+
+    with open(full_path, "w", encoding="utf-8") as f:
+        f.write(full_text)
+
+    _reindex_note(ix, vault_path, full_path)
+    return {"path": rel_path, "created": True}
+
+
+def add_tags_to_note_file(
+    ix: index.Index,
+    vault_path: str,
+    rel_path: str,
+    tags: list[str],
+) -> dict:
+    """Append tags to an existing note's YAML frontmatter, deduplicated."""
+    full_path = os.path.join(vault_path, rel_path)
+    if not os.path.exists(full_path):
+        return {"error": f"Note not found: {rel_path}"}
+
+    with open(full_path, "r", encoding="utf-8") as f:
+        raw = f.read()
+
+    fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", raw, re.DOTALL)
+    if fm_match:
+        try:
+            fm = yaml.safe_load(fm_match.group(1)) or {}
+        except yaml.YAMLError:
+            fm = {}
+        body = raw[fm_match.end():]
+    else:
+        fm = {}
+        body = raw
+
+    existing = list(fm.get("tags") or [])
+    merged = list(dict.fromkeys([*existing, *tags]))
+    fm["tags"] = merged
+    fm["modified"] = datetime.now().replace(microsecond=0).isoformat()
+
+    fm_yaml = yaml.safe_dump(fm, sort_keys=False).strip()
+    with open(full_path, "w", encoding="utf-8") as f:
+        f.write(f"---\n{fm_yaml}\n---\n{body}")
+
+    _reindex_note(ix, vault_path, full_path)
+    return {"path": rel_path, "tags": merged}
+
+
+def add_link_to_note_file(
+    ix: index.Index,
+    vault_path: str,
+    rel_path: str,
+    target_title: str,
+) -> dict:
+    """Append a wiki-style [[link]] to the body of an existing note."""
+    full_path = os.path.join(vault_path, rel_path)
+    if not os.path.exists(full_path):
+        return {"error": f"Note not found: {rel_path}"}
+
+    with open(full_path, "r", encoding="utf-8") as f:
+        raw = f.read()
+
+    link_token = f"[[{target_title.replace(' ', '_')}]]"
+    if link_token in raw:
+        _reindex_note(ix, vault_path, full_path)
+        return {"path": rel_path, "added_link": target_title, "already_present": True}
+
+    new_raw = raw.rstrip() + f"\n\n{link_token}\n"
+    with open(full_path, "w", encoding="utf-8") as f:
+        f.write(new_raw)
+
+    _reindex_note(ix, vault_path, full_path)
+    return {"path": rel_path, "added_link": target_title}
+
+
 # ── Main (for testing) ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":

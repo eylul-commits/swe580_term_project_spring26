@@ -18,6 +18,8 @@ import sys
 import time
 from datetime import datetime
 
+import yaml
+
 from search_backend import build_index, open_index
 from llm_runner import LLMRunner
 from executors import create_executor_a, create_executor_b
@@ -83,19 +85,116 @@ def compute_metrics(extracted: list[str], expected: list[str]) -> dict:
     }
 
 
+# ── Synthesis Ground Truth ─────────────────────────────────────────────────
+
+def cleanup_synthesis_target(query: dict, vault_path: str) -> None:
+    """Remove a synthesis query's expected output file (if present) before the run."""
+    if query.get("category") != "synthesis":
+        return
+    target = query.get("expected_file")
+    if not target:
+        return
+    full = os.path.join(vault_path, target)
+    if os.path.exists(full):
+        try:
+            os.remove(full)
+        except OSError:
+            pass
+
+
+def evaluate_synthesis_file(query: dict, vault_path: str) -> dict:
+    """Check the filesystem after a synthesis query and compute metrics."""
+    rel = query["expected_file"]
+    full = os.path.join(vault_path, rel)
+
+    expected_subs = query.get("expected_substrings", []) or []
+    expected_links = query.get("expected_links", []) or []
+    expected_tags = query.get("expected_tags", []) or []
+
+    if not os.path.exists(full):
+        return {
+            "file_exists": False,
+            "substring_hits": 0,
+            "substring_total": len(expected_subs),
+            "link_hits": 0,
+            "link_total": len(expected_links),
+            "tag_hits": 0,
+            "tag_total": len(expected_tags),
+            "exact_match": False,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+        }
+
+    with open(full, "r", encoding="utf-8") as f:
+        raw = f.read()
+
+    lower = raw.lower()
+    sub_hits = sum(1 for s in expected_subs if s.lower() in lower)
+
+    link_hits = 0
+    for link in expected_links:
+        token_under = f"[[{link.replace(' ', '_')}]]"
+        token_space = f"[[{link.replace('_', ' ')}]]"
+        if token_under in raw or token_space in raw:
+            link_hits += 1
+
+    tag_hits = 0
+    fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", raw, re.DOTALL)
+    if fm_match:
+        try:
+            fm = yaml.safe_load(fm_match.group(1)) or {}
+            file_tags = [str(t).lower() for t in (fm.get("tags") or [])]
+            tag_hits = sum(1 for t in expected_tags if t.lower() in file_tags)
+        except yaml.YAMLError:
+            pass
+
+    sub_ok = sub_hits == len(expected_subs)
+    link_ok = link_hits == len(expected_links)
+    tag_ok = tag_hits == len(expected_tags)
+    exact_match = sub_ok and link_ok and tag_ok
+
+    total_expected = len(expected_subs) + len(expected_links) + len(expected_tags)
+    total_hits = sub_hits + link_hits + tag_hits
+    score = total_hits / total_expected if total_expected else 1.0
+
+    return {
+        "file_exists": True,
+        "substring_hits": sub_hits,
+        "substring_total": len(expected_subs),
+        "link_hits": link_hits,
+        "link_total": len(expected_links),
+        "tag_hits": tag_hits,
+        "tag_total": len(expected_tags),
+        "exact_match": exact_match,
+        "precision": round(score, 4),
+        "recall": round(score, 4),
+        "f1": round(score, 4),
+    }
+
+
 # ── Single Query Evaluation ────────────────────────────────────────────────
 
 def evaluate_query(runner: LLMRunner, query: dict, tools: list, executor,
-                   system_prompt: str = None, verbose: bool = False) -> dict:
+                   system_prompt: str = None, verbose: bool = False,
+                   vault_path: str = "vault") -> dict:
     """Run a single query and evaluate the result."""
+    if query.get("category") == "synthesis":
+        cleanup_synthesis_target(query, vault_path)
+
     kwargs = dict(query=query["query"], tools=tools, tool_executor=executor, verbose=verbose)
     if system_prompt:
         kwargs["system_prompt"] = system_prompt
     result = runner.run(**kwargs)
 
-    extracted = extract_note_paths(result["response"])
-    expected = sorted(query["expected_notes"])
-    metrics = compute_metrics(extracted, expected)
+    if query.get("category") == "synthesis":
+        metrics = evaluate_synthesis_file(query, vault_path)
+        extracted = []
+        expected = []
+    else:
+        extracted = extract_note_paths(result["response"])
+        expected = sorted(query.get("expected_notes", []))
+        metrics = compute_metrics(extracted, expected)
 
     return {
         "query_id": query["id"],
@@ -127,6 +226,7 @@ def run_evaluation(
     delay: float = 2.0,
     verbose: bool = False,
     system_prompt: str = None,
+    vault_path: str = "vault",
 ) -> dict:
     """Run all queries for a configuration and aggregate metrics."""
     results = []
@@ -140,7 +240,8 @@ def run_evaluation(
 
         try:
             result = evaluate_query(runner, query, tools, executor,
-                                    system_prompt=system_prompt, verbose=verbose)
+                                    system_prompt=system_prompt, verbose=verbose,
+                                    vault_path=vault_path)
             status = "✓" if result["exact_match"] else "✗"
             print(f"  {status} exact_match={result['exact_match']} "
                   f"precision={result['precision']} recall={result['recall']} "
@@ -152,7 +253,7 @@ def run_evaluation(
                 "query_id": query["id"],
                 "category": query["category"],
                 "query": query["query"],
-                "expected_notes": query["expected_notes"],
+                "expected_notes": query.get("expected_notes", []),
                 "extracted_notes": [],
                 "error": str(e),
                 "exact_match": False,
@@ -301,9 +402,10 @@ def main():
     # Run Config A
     if args.config in ("a", "both"):
         eval_a = run_evaluation(
-            runner, queries, tools_a, create_executor_a(ix),
+            runner, queries, tools_a, create_executor_a(ix, args.vault),
             config_name="Config A (Coarse-Grained)", delay=args.delay,
             verbose=args.verbose, system_prompt=prompt_a,
+            vault_path=args.vault,
         )
         output_path = os.path.join(args.output_dir, f"config_a_{timestamp}.json")
         with open(output_path, "w") as f:
@@ -313,9 +415,10 @@ def main():
     # Run Config B
     if args.config in ("b", "both"):
         eval_b = run_evaluation(
-            runner, queries, tools_b, create_executor_b(ix),
+            runner, queries, tools_b, create_executor_b(ix, args.vault),
             config_name="Config B (Fine-Grained)", delay=args.delay,
             verbose=args.verbose, system_prompt=prompt_b,
+            vault_path=args.vault,
         )
         output_path = os.path.join(args.output_dir, f"config_b_{timestamp}.json")
         with open(output_path, "w") as f:

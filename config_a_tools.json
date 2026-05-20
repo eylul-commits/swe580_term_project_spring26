@@ -88,5 +88,40 @@
         "required": []
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "create_note",
+      "description": "Create a new markdown note in the vault. A single call can set the path, title, body content, tags, and outgoing wiki links. Use when the user asks to make, create, or write a new note. Tags and links are optional; the file is written with YAML frontmatter and immediately indexed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative file path inside the vault (e.g., 'synthesis/Weekly_Recap.md'). The .md extension is added if missing."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title for the YAML frontmatter. Defaults to the filename with underscores replaced by spaces."
+          },
+          "content": {
+            "type": "string",
+            "description": "Body of the note in markdown. Optional."
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tags to write into the YAML frontmatter. Optional."
+          },
+          "links": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Titles of other notes to insert as wiki-style [[links]] in the body. Spaces are converted to underscores. Optional."
+          }
+        },
+        "required": ["path"]
+      }
+    }
   }
 ]
