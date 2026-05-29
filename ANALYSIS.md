@@ -17,22 +17,21 @@ The point of the comparison is to quantify how much of the score in this evaluat
 
 Both runs use the two configurations defined in the project specification:
 
-| Configuration | Tools | Interface |
-|---|---|---|
-| A | 4 | Coarse-grained, rich parameters (`search_notes` with `query`, `tags`, `date_from`, `date_to`; `get_note`; `get_related_notes` with `direction`; `get_vault_overview`) |
-| B | 9 | Fine-grained, single-purpose (`search_by_content`, `search_by_tags`, `search_by_date`, `get_note_by_path`, `get_note_by_title`, `get_outgoing_links`, `get_incoming_links`, `get_vault_stats`, `get_recent_notes`) |
+
+| Configuration | Tools | Interface                                                                                                                                                                                                          |
+| ------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A             | 4     | Coarse-grained, rich parameters (`search_notes` with `query`, `tags`, `date_from`, `date_to`; `get_note`; `get_related_notes` with `direction`; `get_vault_overview`)                                              |
+| B             | 9     | Fine-grained, single-purpose (`search_by_content`, `search_by_tags`, `search_by_date`, `get_note_by_path`, `get_note_by_title`, `get_outgoing_links`, `get_incoming_links`, `get_vault_stats`, `get_recent_notes`) |
+
 
 The only differences between the customized and vanilla runs are the four editable files: `config_a_prompt.txt`, `config_b_prompt.txt`, `config_a_tools.json`, `config_b_tools.json`. The tool *behavior* (the Python executor functions and the Whoosh backend) is identical.
 
 ### What the customization changed
 
 1. **Answer format directive.** Both customized prompts end with:
-   > After you have gathered enough information, end your response with a single line in exactly this format: `RESULT_PATHS: ["vault/path/one.md", ...]`
-
-   The vanilla prompt has no such directive. This matters because the evaluator extracts predicted notes by regex-matching that line; without it, the LLM's natural-language reply ("I found three notes: Statistics Basics, CNN Architecture, …") is not parseable into note paths.
-
+  > After you have gathered enough information, end your response with a single line in exactly this format: `RESULT_PATHS: ["vault/path/one.md", ...]`
+  >  The vanilla prompt has no such directive. This matters because the evaluator extracts predicted notes by regex-matching that line; without it, the LLM's natural-language reply ("I found three notes: Statistics Basics, CNN Architecture, …") is not parseable into note paths.
 2. **Semantic tool descriptions.** Vanilla descriptions are one-liners ("Search notes by text content."). Customized descriptions specify scope ("Does not filter by tag or date"), combination semantics ("All listed tags must be present (AND logic)"), and when to choose the tool ("Use when the path is already known. Not for searching or browsing.").
-
 3. **Configuration-specific usage hints in the system prompt.** Config A's prompt encourages combining filters inside one `search_notes` call. Config B's prompt explicitly tells the model to call the narrow tools separately and intersect results client-side, and how to pick the right link-direction tool.
 
 ## 2. Methodology
@@ -52,28 +51,32 @@ The only differences between the customized and vanilla runs are the four editab
 
 ### 3.1 Overall metrics
 
-| Metric | Custom A | Vanilla A | Δ | Custom B | Vanilla B | Δ |
-|---|---:|---:|---:|---:|---:|---:|
-| Success rate | **0.560** | 0.320 | +0.240 | **0.600** | 0.320 | +0.280 |
-| Avg F1 | **0.680** | 0.339 | +0.342 | **0.691** | 0.382 | +0.309 |
-| Avg precision | 0.736 | 0.360 | +0.376 | 0.720 | 0.385 | +0.335 |
-| Avg recall | 0.663 | 0.332 | +0.331 | 0.673 | 0.379 | +0.295 |
-| Avg tool calls | 1.04 | 1.08 | −0.04 | 1.56 | 1.28 | +0.28 |
-| Avg tokens / query | 1888 | 756 | +1132 | 2502 | 1134 | +1368 |
-| Avg latency (s) | 8.94 | 6.67 | +2.27 | 9.36 | 8.22 | +1.14 |
 
-The customized prompts roughly **double** F1 for both configurations. Success rate (the strict all-or-nothing measure) goes from 0.32 to ~0.58 on average. The cost is roughly a 2.5× increase in tokens and ~1–2 extra seconds of latency per query, almost entirely because the model now generates a longer, structured response.
+| Metric             | Custom A  | Vanilla A | Δ      | Custom B  | Vanilla B | Δ      |
+| ------------------ | --------- | --------- | ------ | --------- | --------- | ------ |
+| Success rate       | **0.560** | 0.320     | +0.240 | **0.600** | 0.320     | +0.280 |
+| Avg F1             | **0.680** | 0.339     | +0.342 | **0.691** | 0.382     | +0.309 |
+| Avg precision      | 0.736     | 0.360     | +0.376 | 0.720     | 0.385     | +0.335 |
+| Avg recall         | 0.663     | 0.332     | +0.331 | 0.673     | 0.379     | +0.295 |
+| Avg tool calls     | 1.04      | 1.08      | −0.04  | 1.56      | 1.28      | +0.28  |
+| Avg tokens / query | 1888      | 756       | +1132  | 2502      | 1134      | +1368  |
+| Avg latency (s)    | 8.94      | 6.67      | +2.27  | 9.36      | 8.22      | +1.14  |
+
+
+The customized prompts roughly **double** F1 for both configurations. Success rate (the strict all-or-nothing measure) goes from 0.32 to ~0.58 on average. The cost is roughly a 2.5× increase in tokens and ~1-2 extra seconds of latency per query, almost entirely because the model now generates a longer, structured response.
 
 ### 3.2 Per-category F1
 
-| Category | n | Custom A | Vanilla A | Custom B | Vanilla B |
-|---|---:|---:|---:|---:|---:|
-| simple_lookup | 2 | **1.000** | 0.000 | **1.000** | 0.000 |
-| tag_search | 2 | 1.000 | 1.000 | **1.000** | 0.500 |
-| temporal | 3 | **1.000** | 0.667 | **1.000** | 0.667 |
-| content_search | 2 | **1.000** | 0.000 | **1.000** | 0.500 |
-| multi_faceted | 9 | **0.659** | 0.444 | **0.696** | 0.582 |
-| graph_based | 7 | **0.295** | 0.066 | **0.286** | 0.043 |
+
+| Category       | n   | Custom A  | Vanilla A | Custom B  | Vanilla B |
+| -------------- | --- | --------- | --------- | --------- | --------- |
+| simple_lookup  | 2   | **1.000** | 0.000     | **1.000** | 0.000     |
+| tag_search     | 2   | 1.000     | 1.000     | **1.000** | 0.500     |
+| temporal       | 3   | **1.000** | 0.667     | **1.000** | 0.667     |
+| content_search | 2   | **1.000** | 0.000     | **1.000** | 0.500     |
+| multi_faceted  | 9   | **0.659** | 0.444     | **0.696** | 0.582     |
+| graph_based    | 7   | **0.295** | 0.066     | **0.286** | 0.043     |
+
 
 The gain is concentrated in the simple categories (simple_lookup, content_search), where the model under both prompts retrieved the right notes but the vanilla version never reported them in a parseable form. The hardest category, `graph_based`, remains hard under both prompts; customization moves average F1 from ~0.05 to ~0.29, but neither configuration solves it.
 
@@ -81,10 +84,12 @@ The gain is concentrated in the simple categories (simple_lookup, content_search
 
 The single largest driver of the score gap is the answer-format directive. Counting queries where the LLM did call tools but its extracted prediction set is empty (i.e. it answered conversationally instead of emitting the sentinel line):
 
-| Run | Queries with empty extraction despite tool calls |
-|---|---:|
-| Custom A | 5 / 25 |
-| Vanilla A | **15 / 25** |
+
+| Run       | Queries with empty extraction despite tool calls |
+| --------- | ------------------------------------------------ |
+| Custom A  | 5 / 25                                           |
+| Vanilla A | **15 / 25**                                      |
+
 
 Concrete illustration, query `q01` ("Get the note titled Transformers"):
 
@@ -108,33 +113,35 @@ The same ordering holds in the vanilla run (B beats A by one query), so the *rel
 
 For traceability, F1 for each query across all four runs:
 
-| qid | category | A custom | A vanilla | B custom | B vanilla |
-|---|---|---:|---:|---:|---:|
-| q01 | simple_lookup | 1.00 | 0.00 | 1.00 | 0.00 |
-| q02 | simple_lookup | 1.00 | 0.00 | 1.00 | 0.00 |
-| q03 | tag_search | 1.00 | 1.00 | 1.00 | 1.00 |
-| q04 | tag_search | 1.00 | 1.00 | 1.00 | 0.00 |
-| q05 | temporal | 1.00 | 0.00 | 1.00 | 0.00 |
-| q06 | temporal | 1.00 | 1.00 | 1.00 | 1.00 |
-| q07 | content_search | 1.00 | 0.00 | 1.00 | 1.00 |
-| q08 | content_search | 1.00 | 0.00 | 1.00 | 0.00 |
-| q09 | multi_faceted | 0.00 | 0.00 | 0.00 | 0.00 |
-| q10 | graph_based | 0.00 | 0.46 | 1.00 | 0.00 |
-| q11 | multi_faceted | 0.89 | 1.00 | 0.00 | 0.00 |
-| q12 | multi_faceted | 1.00 | 0.00 | 0.67 | 0.00 |
-| q13 | multi_faceted | 0.50 | 1.00 | 1.00 | 1.00 |
-| q14 | multi_faceted | 0.00 | 0.00 | 1.00 | 1.00 |
-| q15 | multi_faceted | 1.00 | 1.00 | 0.80 | 0.91 |
-| q16 | graph_based | 1.00 | 0.00 | 0.00 | 0.00 |
-| q17 | graph_based | 0.00 | 0.00 | 0.00 | 0.00 |
-| q18 | graph_based | 0.00 | 0.00 | 0.00 | 0.00 |
-| q19 | graph_based | 0.40 | 0.00 | 1.00 | 0.00 |
-| q20 | graph_based | 0.00 | 0.00 | 0.00 | 0.30 |
-| q21 | graph_based | 0.67 | 0.00 | 0.00 | 0.00 |
-| q22 | multi_faceted | 1.00 | 0.00 | 0.80 | 0.33 |
-| q23 | multi_faceted | 0.55 | 1.00 | 1.00 | 1.00 |
-| q24 | multi_faceted | 1.00 | 0.00 | 1.00 | 1.00 |
-| q25 | temporal | 1.00 | 1.00 | 1.00 | 1.00 |
+
+| qid | category       | A custom | A vanilla | B custom | B vanilla |
+| --- | -------------- | -------- | --------- | -------- | --------- |
+| q01 | simple_lookup  | 1.00     | 0.00      | 1.00     | 0.00      |
+| q02 | simple_lookup  | 1.00     | 0.00      | 1.00     | 0.00      |
+| q03 | tag_search     | 1.00     | 1.00      | 1.00     | 1.00      |
+| q04 | tag_search     | 1.00     | 1.00      | 1.00     | 0.00      |
+| q05 | temporal       | 1.00     | 0.00      | 1.00     | 0.00      |
+| q06 | temporal       | 1.00     | 1.00      | 1.00     | 1.00      |
+| q07 | content_search | 1.00     | 0.00      | 1.00     | 1.00      |
+| q08 | content_search | 1.00     | 0.00      | 1.00     | 0.00      |
+| q09 | multi_faceted  | 0.00     | 0.00      | 0.00     | 0.00      |
+| q10 | graph_based    | 0.00     | 0.46      | 1.00     | 0.00      |
+| q11 | multi_faceted  | 0.89     | 1.00      | 0.00     | 0.00      |
+| q12 | multi_faceted  | 1.00     | 0.00      | 0.67     | 0.00      |
+| q13 | multi_faceted  | 0.50     | 1.00      | 1.00     | 1.00      |
+| q14 | multi_faceted  | 0.00     | 0.00      | 1.00     | 1.00      |
+| q15 | multi_faceted  | 1.00     | 1.00      | 0.80     | 0.91      |
+| q16 | graph_based    | 1.00     | 0.00      | 0.00     | 0.00      |
+| q17 | graph_based    | 0.00     | 0.00      | 0.00     | 0.00      |
+| q18 | graph_based    | 0.00     | 0.00      | 0.00     | 0.00      |
+| q19 | graph_based    | 0.40     | 0.00      | 1.00     | 0.00      |
+| q20 | graph_based    | 0.00     | 0.00      | 0.00     | 0.30      |
+| q21 | graph_based    | 0.67     | 0.00      | 0.00     | 0.00      |
+| q22 | multi_faceted  | 1.00     | 0.00      | 0.80     | 0.33      |
+| q23 | multi_faceted  | 0.55     | 1.00      | 1.00     | 1.00      |
+| q24 | multi_faceted  | 1.00     | 0.00      | 1.00     | 1.00      |
+| q25 | temporal       | 1.00     | 1.00      | 1.00     | 1.00      |
+
 
 ## 4. Discussion
 
@@ -142,7 +149,7 @@ For traceability, F1 for each query across all four runs:
 
 The dominant signal in this experiment is *not* coarse vs fine. It is whether the prompt tells the model how to report its answer.
 
-Both A and B have basically the same vanilla score (0.34 vs 0.38 avg F1) and basically the same customized score (0.68 vs 0.69). The within-configuration gap from prompt customization (~+0.34 F1) is several times larger than the across-configuration gap (~+0.01 F1). For this evaluator, *what you tell the model to do* outweighs *how you split your tools*.
+Both A and B have basically the same vanilla score (0.34 vs 0.38 avg F1) and basically the same customized score (0.68 vs 0.69). The within-configuration gap from prompt customization (~~+0.34 F1) is several times larger than the across-configuration gap (~~+0.01 F1). For this evaluator, *what you tell the model to do* outweighs *how you split your tools*.
 
 This is partly an artifact of the evaluator design: it scores on a specific output format. But it generalizes to any pipeline that consumes structured output from an LLM. If the spec said "Title the file Transformers.md and return it" and the LLM said "Here is Transformers", a downstream consumer would also fail. Reporting format is part of the tool contract.
 
@@ -160,14 +167,14 @@ Graph-based queries that require multi-hop reasoning (`q17`, `q18`, `q20`, parts
 
 ### 4.4 Cost trade-off
 
-The customized prompts cost roughly **+1100 tokens and +1–2s of latency per query** for both configurations. The extra tokens go to: (a) the longer system prompt itself (~250 tokens), (b) the longer tool/parameter descriptions in the schema (~300 tokens), (c) the model now generating a separate `RESULT_PATHS` line in addition to its natural-language answer (~50 tokens), and (d) more tool calls per query, particularly in Config B which now intersects narrow results.
+The customized prompts cost roughly **+1100 tokens and +1-2s of latency per query** for both configurations. The extra tokens go to: (a) the longer system prompt itself (~~250 tokens), (b) the longer tool/parameter descriptions in the schema (~~300 tokens), (c) the model now generating a separate `RESULT_PATHS` line in addition to its natural-language answer (~50 tokens), and (d) more tool calls per query, particularly in Config B which now intersects narrow results.
 
 For a personal knowledge assistant this is an acceptable trade: at ~$0 marginal cost on Gemini Flash and ~10 s per query, doubling F1 is the right call. For a system at much higher QPS the token overhead would need a second look, but Config A is the cheaper customized option (1888 vs 2502 tokens) and would be the production pick.
 
 ### 4.5 Recommendations
 
 1. **Always specify the answer format in the system prompt** when a downstream parser consumes the model's output. This single change moved more F1 than the entire tool-granularity choice did.
-2. **For tool design specifically, prefer coarse-grained tools (Config A) for this workload.** Same accuracy at lower token and latency cost. Config B's advantage (forcing the model to think about which slice to query) did not materialize at this query mix.
+2. **For tool design specifically, prefer coarse-grained tools (Config A) for this workload.** Same accuracy at lower token and latency cost. Config B's advantage (forcing the model to think about which slice to query) did not materialize at this query mix. The note-creation experiment (§Bonus) reinforces this from the write side: on synthesis queries the two configs were *identical* in correctness (1.00 vs 1.00) but the coarse interface used 5× fewer tool calls and ~4× fewer tokens, because fine-grained creation issues one round-trip per link with no batching.
 3. **Invest description prose in graph/relational tools first.** That is where retrieval (not reporting) gains came from. Search-by-tag and search-by-date were robust regardless of description quality; link-direction tools were not.
 4. **The hardest queries (multi-hop graph, content + tag + date intersections) need orthogonal work**, possibly a planning step, a richer index, or a synthesis tool, rather than more prompt tweaking. Neither A nor B with good prompts cracked them.
 
@@ -177,5 +184,81 @@ Holding the model, backend, vault, and queries constant, customizing the system 
 
 The biggest single intervention was making the system prompt require a structured `RESULT_PATHS` line at the end of the response. This is a property of the evaluator, but it generalizes: any LLM-driven retrieval system that hands its output to a parser needs to treat output format as part of the tool interface.
 
-### Bonus
-to-be-added
+## Bonus: Note Creation Tools and Synthesis Queries
+
+### B.1 Tool design: coarse vs fine
+
+The note creation tools mirror the granularity of the search tools, so the same A vs B contrast applies:
+
+
+|                                        | Config A (coarse)                                                                                    | Config B (fine)                                                                                                             |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Creation interface                     | **One** tool, `create_note(path, title, content, tags, links)`: path, body, tags, and outgoing links | **Three** tools: `create_note(path, title, content)`, `add_tags_to_note(path, tags)`, `add_link_to_note(path,target_title)` |
+| Calls to build a (tagged, 3 link) note | 1                                                                                                    | 1 + 1 + 3 = **5 (with one call per tag set and one call per link)**                                                         |
+| System-prompt guidance                 | "prefer one `create_note` call that already includes the desired tags and links"                     | "call `create_note` first, then `add_tags_to_note` and `add_link_to_note` for each tag and each link"                       |
+
+
+All three tools are backed by shared functions in `search_backend.py` that write the markdown file with YAML frontmatter and re-index it via `_reindex_note`. A newly created note is searchable within the same session. 
+
+### B.2 Synthesis queries and evaluation method
+
+Three synthesis queries (`qs01`-`qs03`) were added to `test_queries.json` under a new `synthesis` category. These are the only inputs that use the new write tools and each one also carries the ground truth (target path, tags, links):
+
+
+| qid  | New note                                    | Expected tags         | Expected links                                     |
+| ---- | ------------------------------------------- | --------------------- | -------------------------------------------------- |
+| qs01 | `synthesis/Attention_Summary.md`            | `summary`, `nlp`      | Transformers, Self Attention, Attention Mechanisms |
+| qs02 | `synthesis/Python_Toolkit.md`               | `reference`, `python` | Python Tips, Pandas Tips, Numpy Guide              |
+| qs03 | `synthesis/Language_Models_Reading_List.md` | `reading-list`, `nlp` | BERT, GPT, Transformers                            |
+
+
+Synthesis can't be scored by the `RESULT_PATHS` regex used for retrieval, because the "answer" is a file on disk, not a list of retrieved paths. The evaluator therefore handles the `synthesis` category separately (`evaluate_synthesis_file` in `evaluator.py`):
+
+1. **Before** the query runs, `cleanup_synthesis_target` deletes any pre-existing target file, so each run starts clean.
+2. The model is given the query and the creation tools and left to act.
+3. **After** the run, the evaluator inspects the filesystem and checks, against the ground truth: (a) the file exists at the expected path, (b) each expected tag is present in the YAML frontmatter, (c) each expected `[[link]]` is present in the body. The per-query score is `(tag_hits + link_hits) / (tags_total + links_total)`. `exact_match` requires every tag and every link present.
+
+### B.3 Results
+
+Run `20260529_152011`, `google/gemini-2.5-flash`, same vault. Each synthesis query is scored on the file the model wrote to disk (file location + frontmatter tags + body links).
+
+Per-query outcome: **every synthesis query is an exact match under both configurations**:
+
+
+| qid  | A exact | A links | A tags | A tool calls | B exact | B links | B tags | B tool calls |
+| ---- | ------- | ------- | ------ | ------------ | ------- | ------- | ------ | ------------ |
+| qs01 | ✓       | 3/3     | 2/2    | 1            | ✓       | 3/3     | 2/2    | 5            |
+| qs02 | ✓       | 3/3     | 2/2    | 1            | ✓       | 3/3     | 2/2    | 5            |
+| qs03 | ✓       | 3/3     | 2/2    | 1            | ✓       | 3/3     | 2/2    | 5            |
+
+
+Aggregate (synthesis category only):
+
+
+| Metric                     | Config A | Config B | B / A    |
+| -------------------------- | -------- | -------- | -------- |
+| Success rate (exact_match) | **1.00** | **1.00** | 1.0×     |
+| Avg F1 (structural)        | **1.00** | **1.00** | 1.0×     |
+| Avg tool calls             | 1.00     | 5.00     | **5.0×** |
+| Avg tokens / query         | 2153     | 8491     | **3.9×** |
+| Avg latency (s)            | 1.41     | 4.58     | **3.3×** |
+
+
+Both interfaces produced perfectly correct notes on all three queries. The entire difference is cost: Config B spent **5× the tool calls, ~4× the tokens (+6338 per note) and ~3.3× the latency** to write a file identical in tags, links and location to the one Config A produced in a single call.
+
+### B.4 Conclusion
+
+**Correctness is tied, the interface only changes the bill.** This means for a task with an unambiguous structural target, granularity made no quality difference at all.
+
+**The coarse cost advantage is marginal for reads. However, it becoms decisive for writes.** Comparing the same run's retrieval queries against its synthesis queries:
+
+
+|                  | A tool calls | B tool calls | B/A      | A tokens | B tokens | B/A      |
+| ---------------- | ------------ | ------------ | -------- | -------- | -------- | -------- |
+| Retrieval (25 q) | 1.00         | 1.28         | 1.3×     | 2223     | 3318     | 1.5×     |
+| Synthesis (3 q)  | 1.00         | 5.00         | **5.0×** | 2153     | 8491     | **3.9×** |
+
+
+For reads, Config B issues only ~0.28 extra calls and ~1.5× the tokens. For writes, the tax balloons to 5× the calls and ~4× the tokens for an equivalent result.
+
+I expected fine grained creation to also lose accuracy (more calls, more chances to forget a link). The data did not show that. However using fine-grained creation in this case can be considered *wasteful*. 
