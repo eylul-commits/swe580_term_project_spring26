@@ -4,12 +4,10 @@
 **Author:** Eylul Erdinc
 **Date:** 2026-05-20
 
-This report compares two evaluation runs of the same tool-granularity experiment. The variable held constant across the two runs is the search backend, the vault, the 25 test queries, the LLM (`google/gemini-2.5-flash` via OpenRouter), and the tool *signatures* (names and parameter schemas). The variable that differs is the **system prompt and the prose of the tool/parameter descriptions**.
+This report compares two evaluation runs for our tool-granularity experiment. The variable held constant across the two runs is the search backend, the vault, the 25 test queries, the LLM (`google/gemini-2.5-flash` via OpenRouter), and the tool *signatures* (names and parameter schemas). The variable that differs is the **system prompt and the prose of the tool descriptions**.
 
-- **Customized run** (`20260520_153009`): system prompts and tool descriptions written by the author. Tool descriptions explain semantics (AND-logic, "use this when…"), parameter docs clarify expectations, and both system prompts require the model to end with a machine-readable `RESULT_PATHS: [...]` line.
-- **Vanilla run** (`20260520_155547`): the default one-line system prompt ("You are a helpful assistant…") and the default one-sentence tool descriptions distributed with the project skeleton. No answer-format directive.
-
-The point of the comparison is to quantify how much of the score in this evaluator is driven by the *quality of the prose around the tools*, independent of how many tools there are.
+- **Customized run** (`20260520_153009`): detailed system prompts and tool descriptions. Tool descriptions explain semantics ("use this when…"), parameter docs clarify expectations and both system prompts require the model to end with a `RESULT_PATHS: [...]` line.
+- **Vanilla run** (`20260520_155547`): the default one-line system prompt and the default one-sentence tool descriptions distributed with the project skeleton.
 
 ---
 
@@ -24,15 +22,15 @@ Both runs use the two configurations defined in the project specification:
 | B             | 9     | Fine-grained, single-purpose (`search_by_content`, `search_by_tags`, `search_by_date`, `get_note_by_path`, `get_note_by_title`, `get_outgoing_links`, `get_incoming_links`, `get_vault_stats`, `get_recent_notes`) |
 
 
-The only differences between the customized and vanilla runs are the four editable files: `config_a_prompt.txt`, `config_b_prompt.txt`, `config_a_tools.json`, `config_b_tools.json`. The tool *behavior* (the Python executor functions and the Whoosh backend) is identical.
+The only differences between the customized and vanilla runs are the four editable files: `config_a_prompt.txt`, `config_b_prompt.txt`, `config_a_tools.json`, `config_b_tools.json`. The tool *behavior* is identical.
 
 ### What the customization changed
 
 1. **Answer format directive.** Both customized prompts end with:
-  > After you have gathered enough information, end your response with a single line in exactly this format: `RESULT_PATHS: ["vault/path/one.md", ...]`
-  >  The vanilla prompt has no such directive. This matters because the evaluator extracts predicted notes by regex-matching that line; without it, the LLM's natural-language reply ("I found three notes: Statistics Basics, CNN Architecture, …") is not parseable into note paths.
-2. **Semantic tool descriptions.** Vanilla descriptions are one-liners ("Search notes by text content."). Customized descriptions specify scope ("Does not filter by tag or date"), combination semantics ("All listed tags must be present (AND logic)"), and when to choose the tool ("Use when the path is already known. Not for searching or browsing.").
-3. **Configuration-specific usage hints in the system prompt.** Config A's prompt encourages combining filters inside one `search_notes` call. Config B's prompt explicitly tells the model to call the narrow tools separately and intersect results client-side, and how to pick the right link-direction tool.
+  > After you have gathered enough information, end your response with a single line in exactly this format: `RESULT_PATHS: ["vault/path/one.md", ...]`  
+  >  The vanilla prompt has no such directive. This matters because the evaluator extracts predicted notes by regex-matching that line.
+2. **Semantic tool descriptions.** Vanilla descriptions are one liners. Customized descriptions specify scope ("Does not filter by tag or date"), combination semantics ("All listed tags must be present (AND logic)"), and when to choose the tool ("Use when the path is already known. Not for searching or browsing.").
+3. **Configuration specific usage hints in the system prompt.** Config A's prompt encourages combining filters inside one `search_notes` call. Config B's prompt explicitly tells the model to call the narrow tools separately and intersect results and how to pick the right link direction tool.
 
 ## 2. Methodology
 
@@ -63,7 +61,7 @@ The only differences between the customized and vanilla runs are the four editab
 | Avg latency (s)    | 8.94      | 6.67      | +2.27  | 9.36      | 8.22      | +1.14  |
 
 
-The customized prompts roughly **double** F1 for both configurations. Success rate (the strict all-or-nothing measure) goes from 0.32 to ~0.58 on average. The cost is roughly a 2.5× increase in tokens and ~1-2 extra seconds of latency per query, almost entirely because the model now generates a longer, structured response.
+The customized prompts roughly **double** F1 for both configurations. Success rate goes from 0.32 to ~0.58 on average. The cost is roughly a 2.5× increase in tokens and ~1-2 extra seconds of latency per query, almost entirely because the model now generates a longer response.
 
 ### 3.2 Per-category F1
 
@@ -78,11 +76,11 @@ The customized prompts roughly **double** F1 for both configurations. Success ra
 | graph_based    | 7   | **0.295** | 0.066     | **0.286** | 0.043     |
 
 
-The gain is concentrated in the simple categories (simple_lookup, content_search), where the model under both prompts retrieved the right notes but the vanilla version never reported them in a parseable form. The hardest category, `graph_based`, remains hard under both prompts; customization moves average F1 from ~0.05 to ~0.29, but neither configuration solves it.
+The gain is concentrated in the simple categories (simple_lookup, content_search), where the model under both prompts retrieved the right notes but the vanilla version never reported them in a parseable form. The hardest category, `graph_based`, remains hard under both prompts. Customization moves average F1 from ~0.05 to ~0.29, but neither configuration solves it.
 
 ### 3.3 Where the missing 25 points come from: the `RESULT_PATHS` effect
 
-The single largest driver of the score gap is the answer-format directive. Counting queries where the LLM did call tools but its extracted prediction set is empty (i.e. it answered conversationally instead of emitting the sentinel line):
+The single largest driver of the score gap is the answer-format directive. Counting queries where the LLM did call tools but its extracted prediction set is empty (it answered conversationally instead of emitting the specific line):
 
 
 | Run       | Queries with empty extraction despite tool calls |
@@ -93,21 +91,21 @@ The single largest driver of the score gap is the answer-format directive. Count
 
 Concrete illustration, query `q01` ("Get the note titled Transformers"):
 
-- **Vanilla A:** correctly calls `get_note(title="Transformers")`. Final response begins `"# Transformers\n\nThe Transformer architecture was introduced…"`, i.e. the model pasted the note's content as its answer. `extracted_notes = []`. F1 = 0.00.
-- **Custom A:** same tool call; final response is exactly `RESULT_PATHS: ["research\\Transformers.md"]`. F1 = 1.00.
+- **Vanilla A:** correctly calls `get_note(title="Transformers")`. Final response begins `"# Transformers\n\nThe Transformer architecture was introduced…"`, the model pasted the note's content as its answer. `extracted_notes = []`. F1 = 0.00.
+- **Custom A:** same tool call, final response is exactly `RESULT_PATHS: ["research\\Transformers.md"]`. F1 = 1.00.
 
-The retrieval was correct both times. Only the reporting differed. The same pattern explains every simple_lookup and content_search win, and most of the temporal wins. Across the 25 queries this format effect alone accounts for roughly 10 of the ~14 F1-point swing per configuration.
+The retrieval was correct both times. Only the reporting differed. The same pattern explains every simple_lookup and content_search win and most of the temporal wins. Across the 25 queries this format effect alone accounts for roughly 10 of the ~14 F1 point increase per configuration.
 
 ### 3.4 Coarse vs fine, holding the prompt fixed
 
 Within the customized run the two configurations land in essentially the same place:
 
-- Success rate: A 0.56 vs B 0.60, a 1-query difference (14 vs 15 exact matches out of 25).
-- F1: A 0.680 vs B 0.691, within noise.
+- Success rate: A 0.56 vs B 0.60, a 1 query difference (14 vs 15 exact matches out of 25).
+- F1: A 0.680 vs B 0.691.
 
-Config B uses **more tool calls** (1.56 vs 1.04) and **more tokens** (2502 vs 1888) to reach a near-identical accuracy, because the model has to issue multiple narrow queries and intersect results itself for multi-faceted questions. Config A's `search_notes` accepts `query`, `tags`, `date_from`, `date_to` in a single call.
+Config B uses **more tool calls** (1.56 vs 1.04) and **more tokens** (2502 vs 1888) to reach a near identical accuracy. Because the model has to issue multiple narrow queries and intersect results itself for multi-faceted questions. Config A's `search_notes` accepts `query`, `tags`, `date_from`, `date_to` in a single call.
 
-The same ordering holds in the vanilla run (B beats A by one query), so the *relative* ranking of A vs B is stable, but the absolute scores are so depressed by the missing `RESULT_PATHS` that the comparison is much noisier.
+The same ordering holds in the vanilla run (B beats A by one query), so the *relative* ranking of A vs B is the same. But the absolute scores are so low beacause of the missing `RESULT_PATHS` that the comparison is much noisier.
 
 ### 3.5 Per-query F1 table
 
@@ -147,42 +145,42 @@ For traceability, F1 for each query across all four runs:
 
 ### 4.1 Prompt engineering swamps tool granularity
 
-The dominant signal in this experiment is *not* coarse vs fine. It is whether the prompt tells the model how to report its answer.
+The main signal in this experiment is *not* coarse vs fine. It is whether the prompt tells the model how to report its answer.
 
-Both A and B have basically the same vanilla score (0.34 vs 0.38 avg F1) and basically the same customized score (0.68 vs 0.69). The within-configuration gap from prompt customization (~~+0.34 F1) is several times larger than the across-configuration gap (~~+0.01 F1). For this evaluator, *what you tell the model to do* outweighs *how you split your tools*.
+Both A and B have basically the same vanilla score (0.34 vs 0.38 avg F1) and basically the same customized score (0.68 vs 0.69). For this evaluator, *what you tell the model to do* outweighs *how you split your tools*.
 
-This is partly an artifact of the evaluator design: it scores on a specific output format. But it generalizes to any pipeline that consumes structured output from an LLM. If the spec said "Title the file Transformers.md and return it" and the LLM said "Here is Transformers", a downstream consumer would also fail. Reporting format is part of the tool contract.
+This is partly an artifact of the evaluator design: it scores on a specific output format. But it generalizes to any pipeline that consumes structured output from an LLM. 
 
 ### 4.2 Where customized tool descriptions actually helped
 
-Stripping out the format effect (queries where vanilla returned nothing parseable), three categories show real retrieval gains from the richer descriptions:
+Stripping out the format effect, three categories show real retrieval gains from the richer descriptions:
 
-- **Multi-faceted (Config B), `q22` and `q24`:** vanilla left tag-search tools underused or combined inputs incorrectly; the customized "All listed tags must be present (AND logic)" hint produced the right tag combinations.
-- **Graph-based, generally:** customized descriptions for `get_related_notes(direction=...)` and `get_incoming_links` / `get_outgoing_links` clarified which direction maps to "links to X" vs "X links to". Vanilla scored 0.07 / 0.04 on this category; customized doubled to ~0.29. This is the largest *retrieval* (not formatting) win.
-- **Tag-search (Config B):** vanilla split tags incorrectly on `q04`; the explicit AND-logic note fixed it.
+- **Multi-faceted (Config B),** `q22` **and** `q24`**:** vanilla left tag search tools underused or combined inputs incorrectly; the customized "All listed tags must be present" hint produced the right tag combinations.
+- **Graph-based, generally:** customized descriptions for `get_related_notes(direction=...)` and `get_incoming_links` / `get_outgoing_links` clarified which direction maps to "links to X" vs "X links to". Vanilla scored 0.07 / 0.04 on this category. Customized doubled to ~0.29. This is the largest *retrieval* (not formatting) win.
+- **Tag-search (Config B):** vanilla split tags incorrectly on `q04`, the explicit AND-logic note fixed it.
 
 ### 4.3 Where neither configuration succeeded
 
-Graph-based queries that require multi-hop reasoning (`q17`, `q18`, `q20`, parts of `q19`) and the multi-faceted `q09` ("research notes about attention from January 2026") remained at F1 ≈ 0 in both runs. The failure mode for these is not reporting but search semantics: the model either picks the wrong source note for a link query, or the content/date intersection returns nothing because the relevant notes aren't tagged the way the query implies. Better prompts and richer descriptions did not close this gap. These are the queries where extra tool calls (Config B's narrow tools used 1.56 vs A's 1.04 on average) would in principle help, but the model still doesn't compose them correctly.
+Graph-based queries that require multi-hop reasoning (`q17`, `q18`, `q20`, parts of `q19`) and the multi-faceted `q09` ("research notes about attention from January 2026") remained at F1 ≈ 0 in both runs. The failure mode for these is not reporting but search semantics: the model either picks the wrong source note for a link query, or the content/date intersection returns nothing because the relevant notes aren't tagged the way the query implies. Better prompts and richer descriptions did not close this gap. In principle these are the queries that should reward Config B's step by step style, since its narrow tools already make more calls per query (1.56 vs A's 1.04) and could decompose a hard query into separate search and link steps. In practice the model still chains those steps incorrectly. Extra calls buy no accuracy on this hard subset.
 
 ### 4.4 Cost trade-off
 
-The customized prompts cost roughly **+1100 tokens and +1-2s of latency per query** for both configurations. The extra tokens go to: (a) the longer system prompt itself (~~250 tokens), (b) the longer tool/parameter descriptions in the schema (~~300 tokens), (c) the model now generating a separate `RESULT_PATHS` line in addition to its natural-language answer (~50 tokens), and (d) more tool calls per query, particularly in Config B which now intersects narrow results.
+The customized prompts cost roughly **+1100 tokens and +1-2s of latency per query** for both configurations. The extra tokens go to: (a) the longer system prompt itself (250 tokens), (b) the longer tool descriptions in the schema (~300 tokens), (c) the model now generating a separate `RESULT_PATHS` line in addition to its natural-language answer (50 tokens), and (d) more tool calls per query, particularly in Config B (narrow results).
 
-For a personal knowledge assistant this is an acceptable trade: at ~$0 marginal cost on Gemini Flash and ~10 s per query, doubling F1 is the right call. For a system at much higher QPS the token overhead would need a second look, but Config A is the cheaper customized option (1888 vs 2502 tokens) and would be the production pick.
+For a personal knowledge assistant the trade is worth it: doubling F1 costs almost nothing on Gemini Flash and only a few seconds per query. At high request volumes the extra tokens matter more and there Config A is the better pick because it is the cheaper of the two options (1888 vs 2502 tokens).
 
-### 4.5 Recommendations
+### 4.5 Discussion
 
 1. **Always specify the answer format in the system prompt** when a downstream parser consumes the model's output. This single change moved more F1 than the entire tool-granularity choice did.
-2. **For tool design specifically, prefer coarse-grained tools (Config A) for this workload.** Same accuracy at lower token and latency cost. Config B's advantage (forcing the model to think about which slice to query) did not materialize at this query mix. The note-creation experiment (§Bonus) reinforces this from the write side: on synthesis queries the two configs were *identical* in correctness (1.00 vs 1.00) but the coarse interface used 5× fewer tool calls and ~4× fewer tokens, because fine-grained creation issues one round-trip per link with no batching.
-3. **Invest description prose in graph/relational tools first.** That is where retrieval (not reporting) gains came from. Search-by-tag and search-by-date were robust regardless of description quality; link-direction tools were not.
-4. **The hardest queries (multi-hop graph, content + tag + date intersections) need orthogonal work**, possibly a planning step, a richer index, or a synthesis tool, rather than more prompt tweaking. Neither A nor B with good prompts cracked them.
+2. **For tool design specifically, prefer coarse-grained tools (Config A) for this workload.** It reaches the same accuracy while using fewer tokens and less time. The expected upside of Config B never showed up on these queries. The note-creation experiment reinforces this from the write side: on synthesis queries the two configs were *identical* in correctness (1.00 vs 1.00) but the coarse interface used 5× fewer tool calls and ~4× fewer tokens.
+3. **Write the most careful descriptions for the link tools first.** That is where better descriptions actually improved retrieval. Tag search and date search worked well no matter how they were described, the link direction tools did not.
+4. **The hardest queries need a different approach, not more prompt tweaking.** Multi-hop graph queries and combined content + tag + date queries would need something like a planning step or a richer index. Good prompts did not solve them in either config.
 
 ## 5. Conclusion
 
 Holding the model, backend, vault, and queries constant, customizing the system prompt and tool descriptions roughly doubled F1 for both the coarse-grained (Config A) and the fine-grained (Config B) tool configurations: from ~0.34/0.38 to ~0.68/0.69. The two configurations land within 0.01 F1 of each other under good prompts; Config A reaches that accuracy with ~25% fewer tokens and ~25% fewer tool calls, so it is the better default for this workload.
 
-The biggest single intervention was making the system prompt require a structured `RESULT_PATHS` line at the end of the response. This is a property of the evaluator, but it generalizes: any LLM-driven retrieval system that hands its output to a parser needs to treat output format as part of the tool interface.
+The biggest single intervention was making the system prompt require a structured `RESULT_PATHS` line at the end of the response. 
 
 ## Bonus: Note Creation Tools and Synthesis Queries
 
