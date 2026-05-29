@@ -1,0 +1,134 @@
+{
+  "timestamp": "20260529_152011",
+  "model": "google/gemini-2.5-flash",
+  "base_url": "https://openrouter.ai/api/v1",
+  "num_queries": 28,
+  "config_a": {
+    "config": "Config A (Coarse-Grained)",
+    "total_queries": 28,
+    "exact_matches": 17,
+    "success_rate": 0.6071,
+    "avg_precision": 0.7071,
+    "avg_recall": 0.6696,
+    "avg_f1": 0.677,
+    "avg_tool_calls": 1.0,
+    "avg_tokens": 2215.9,
+    "avg_latency": 1.759,
+    "total_tokens": 62045,
+    "by_category": {
+      "content_search": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "graph_based": {
+        "count": 7,
+        "exact_matches": 1,
+        "success_rate": 0.1429,
+        "avg_f1": 0.2952,
+        "avg_tool_calls": 1.0
+      },
+      "multi_faceted": {
+        "count": 9,
+        "exact_matches": 4,
+        "success_rate": 0.4444,
+        "avg_f1": 0.5432,
+        "avg_tool_calls": 1.0
+      },
+      "simple_lookup": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "synthesis": {
+        "count": 3,
+        "exact_matches": 3,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "tag_search": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "temporal": {
+        "count": 3,
+        "exact_matches": 3,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      }
+    }
+  },
+  "config_b": {
+    "config": "Config B (Fine-Grained)",
+    "total_queries": 28,
+    "exact_matches": 18,
+    "success_rate": 0.6429,
+    "avg_precision": 0.7484,
+    "avg_recall": 0.7976,
+    "avg_f1": 0.76,
+    "avg_tool_calls": 1.68,
+    "avg_tokens": 3872.5,
+    "avg_latency": 2.067,
+    "total_tokens": 108431,
+    "by_category": {
+      "content_search": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "graph_based": {
+        "count": 7,
+        "exact_matches": 3,
+        "success_rate": 0.4286,
+        "avg_f1": 0.4853,
+        "avg_tool_calls": 1.71
+      },
+      "multi_faceted": {
+        "count": 9,
+        "exact_matches": 3,
+        "success_rate": 0.3333,
+        "avg_f1": 0.6537,
+        "avg_tool_calls": 1.22
+      },
+      "simple_lookup": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "synthesis": {
+        "count": 3,
+        "exact_matches": 3,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 5.0
+      },
+      "tag_search": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "temporal": {
+        "count": 3,
+        "exact_matches": 3,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      }
+    }
+  }
+}

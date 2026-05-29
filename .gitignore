@@ -2,7 +2,6 @@ vault/.whoosh_index/
 __pycache__/
 *.pyc
 venv/
-results/
 .env
 HOMEWORK.md
 .claude/settings.local.json

@@ -1,0 +1,120 @@
+{
+  "timestamp": "20260529_230439",
+  "model": "meta-llama/llama-3.1-8b-instruct",
+  "base_url": "https://openrouter.ai/api/v1",
+  "num_queries": 25,
+  "config_a": {
+    "config": "Config A (Coarse-Grained)",
+    "total_queries": 25,
+    "exact_matches": 5,
+    "success_rate": 0.2,
+    "avg_precision": 0.24,
+    "avg_recall": 0.212,
+    "avg_f1": 0.2185,
+    "avg_tool_calls": 3.44,
+    "avg_tokens": 7565.5,
+    "avg_latency": 9.448,
+    "total_tokens": 189137,
+    "by_category": {
+      "content_search": {
+        "count": 2,
+        "exact_matches": 1,
+        "success_rate": 0.5,
+        "avg_f1": 0.5,
+        "avg_tool_calls": 5.5
+      },
+      "graph_based": {
+        "count": 7,
+        "exact_matches": 0,
+        "success_rate": 0.0,
+        "avg_f1": 0.0659,
+        "avg_tool_calls": 4.14
+      },
+      "multi_faceted": {
+        "count": 9,
+        "exact_matches": 1,
+        "success_rate": 0.1111,
+        "avg_f1": 0.1111,
+        "avg_tool_calls": 2.89
+      },
+      "simple_lookup": {
+        "count": 2,
+        "exact_matches": 1,
+        "success_rate": 0.5,
+        "avg_f1": 0.5,
+        "avg_tool_calls": 1.5
+      },
+      "tag_search": {
+        "count": 2,
+        "exact_matches": 0,
+        "success_rate": 0.0,
+        "avg_f1": 0.0,
+        "avg_tool_calls": 2.0
+      },
+      "temporal": {
+        "count": 3,
+        "exact_matches": 2,
+        "success_rate": 0.6667,
+        "avg_f1": 0.6667,
+        "avg_tool_calls": 4.33
+      }
+    }
+  },
+  "config_b": {
+    "config": "Config B (Fine-Grained)",
+    "total_queries": 25,
+    "exact_matches": 9,
+    "success_rate": 0.36,
+    "avg_precision": 0.44,
+    "avg_recall": 0.3933,
+    "avg_f1": 0.4067,
+    "avg_tool_calls": 2.28,
+    "avg_tokens": 5564.5,
+    "avg_latency": 6.52,
+    "total_tokens": 139112,
+    "by_category": {
+      "content_search": {
+        "count": 2,
+        "exact_matches": 2,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.0
+      },
+      "graph_based": {
+        "count": 7,
+        "exact_matches": 1,
+        "success_rate": 0.1429,
+        "avg_f1": 0.1429,
+        "avg_tool_calls": 1.86
+      },
+      "multi_faceted": {
+        "count": 9,
+        "exact_matches": 2,
+        "success_rate": 0.2222,
+        "avg_f1": 0.3519,
+        "avg_tool_calls": 3.22
+      },
+      "simple_lookup": {
+        "count": 2,
+        "exact_matches": 0,
+        "success_rate": 0.0,
+        "avg_f1": 0.0,
+        "avg_tool_calls": 2.5
+      },
+      "tag_search": {
+        "count": 2,
+        "exact_matches": 1,
+        "success_rate": 0.5,
+        "avg_f1": 0.5,
+        "avg_tool_calls": 2.0
+      },
+      "temporal": {
+        "count": 3,
+        "exact_matches": 3,
+        "success_rate": 1.0,
+        "avg_f1": 1.0,
+        "avg_tool_calls": 1.33
+      }
+    }
+  }
+}
